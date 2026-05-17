@@ -16,6 +16,49 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
 
+// --- IndexedDB for Local Audio Storage ---
+const DB_NAME = 'WordByWordDB';
+const STORE_NAME = 'audioStore';
+
+function initDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, 1);
+    request.onupgradeneeded = (e) => {
+      e.target.result.createObjectStore(STORE_NAME);
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function saveAudio(file) {
+  try {
+    const db = await initDB();
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    store.put(file, 'savedAudio');
+  } catch(e) {
+    console.error("Could not save audio to DB", e);
+  }
+}
+
+async function loadAudio() {
+  try {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.get('savedAudio');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  } catch(e) {
+    console.error(e);
+    return null;
+  }
+}
+// -----------------------------------------
+
 // State
 let currentUser = null;
 let isHost = false; // true if audio is loaded locally
@@ -154,10 +197,25 @@ function handleAudio(f) {
   dzAudio.querySelector('p').innerHTML = `<strong>${f.name}</strong><br>Ready to play`;
   playingFilename.textContent = f.name;
   
+  saveAudio(f);
+  
   if (currentUser) {
     update(ref(db, `users/${currentUser.uid}/session/state`), { fileName: f.name });
   }
 }
+
+// Try to load saved audio on startup
+loadAudio().then(f => {
+  if (f) {
+    audio.src = URL.createObjectURL(f);
+    audio.load();
+    audioFileLoaded = true;
+    setHostMode(true);
+    dzAudio.classList.add('loaded');
+    dzAudio.querySelector('p').innerHTML = `<strong>${f.name}</strong><br>Loaded from local storage`;
+    playingFilename.textContent = f.name;
+  }
+});
 
 function handleText(f) {
   const r = new FileReader();
