@@ -3,12 +3,12 @@ import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signO
 import { getDatabase, ref, set, onValue, update, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyARreH7yBFdaeYwMQftLjUfRvSy9KnijBA",
-  authDomain: "transcript-manager-61e39.firebaseapp.com",
-  projectId: "transcript-manager-61e39",
-  storageBucket: "transcript-manager-61e39.firebasestorage.app",
-  messagingSenderId: "865889949005",
-  appId: "1:865889949005:web:c4c559b0f19569fce6d304"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
 const app = initializeApp(firebaseConfig);
