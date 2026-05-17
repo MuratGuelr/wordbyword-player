@@ -50,6 +50,12 @@ html, body {
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
+@media (max-width: 768px) {
+  .app-container {
+    padding: 0;
+  }
+}
+
 .hidden {
   display: none !important;
 }
@@ -78,6 +84,44 @@ html, body {
   border-radius: 100px;
   box-shadow: 0 4px 20px rgba(0,0,0,0.2);
   flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .glass-header {
+    margin: 0;
+    border-radius: 0;
+    padding: 6px 10px;
+    border-left: none;
+    border-right: none;
+    border-top: none;
+  }
+  header h1 {
+    display: none;
+  }
+  .logo-icon {
+    width: 28px;
+    height: 28px;
+  }
+  .logo-icon svg {
+    width: 14px;
+    height: 14px;
+  }
+  .btn-icon {
+    width: 28px;
+    height: 28px;
+  }
+  .btn-icon svg {
+    width: 16px;
+    height: 16px;
+  }
+  .user-profile img {
+    width: 24px;
+    height: 24px;
+  }
+  .btn-primary {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
 }
 
 .logo-area {
@@ -232,6 +276,11 @@ header h1 {
   }
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+}
+
 /* --- MAIN CONTENT --- */
 .main-content {
   flex: 1;
@@ -240,6 +289,13 @@ header h1 {
   padding: 16px;
   gap: 16px;
   min-height: 0;
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    padding: 8px;
+    gap: 8px;
+  }
 }
 
 /* --- UPLOAD DRAWER --- */
@@ -440,6 +496,20 @@ header h1 {
   box-shadow: 0 0 10px rgba(240, 165, 0, 0.2);
 }
 
+@media (max-width: 768px) {
+  .transcript-header {
+    padding: 8px 10px;
+  }
+  .mode-btn {
+    padding: 4px 12px;
+    font-size: 12px;
+  }
+  .search-box input {
+    padding: 6px 12px 6px 32px;
+    font-size: 12px;
+  }
+}
+
 .transcript-scroll {
   flex: 1;
   overflow-y: auto;
@@ -511,6 +581,14 @@ header h1 {
   border: 1px solid transparent;
 }
 
+@media (max-width: 768px) {
+  .seg {
+    gap: 10px;
+    padding: 8px 10px;
+    margin-bottom: 4px;
+  }
+}
+
 .seg:hover {
   background: rgba(255, 255, 255, 0.03);
 }
@@ -540,6 +618,13 @@ header h1 {
   color: rgba(255, 255, 255, 0.8);
 }
 
+@media (max-width: 768px) {
+  .seg-text {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+}
+
 .seg.active .seg-text {
   color: #fff;
   font-weight: 500;
@@ -557,6 +642,17 @@ header h1 {
   font-size: 18px;
   line-height: 2.2;
   padding: 10px;
+}
+
+@media (max-width: 768px) {
+  .prose {
+    font-size: 15px;
+    line-height: 1.8;
+    padding: 4px;
+  }
+  .w-word {
+    padding: 2px;
+  }
 }
 
 .w-ts {
@@ -603,9 +699,37 @@ header h1 {
 
 @media (max-width: 768px) {
   .player-container {
-    flex-direction: column;
-    gap: 16px;
-    padding: 16px;
+    margin: 0;
+    border-radius: 0;
+    flex-direction: row;
+    gap: 12px;
+    padding: 8px 12px;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+  }
+  .player-info {
+    display: none;
+  }
+  .controls-area {
+    width: auto;
+    flex: none;
+  }
+  .btn-play {
+    width: 44px;
+    height: 44px;
+  }
+  .btn-play svg {
+    width: 20px;
+    height: 20px;
+  }
+  .btn-secondary {
+    width: 32px;
+    height: 32px;
+  }
+  .btn-secondary svg {
+    width: 16px;
+    height: 16px;
   }
 }
 
@@ -700,7 +824,62 @@ header h1 {
 
 @media (max-width: 768px) {
   .controls-area {
-    justify-content: center;
-    width: 100%;
+    justify-content: flex-end;
   }
+}
+
+/* --- FOCUS MODE --- */
+body.focus-mode .glass-header,
+body.focus-mode .player-container,
+body.focus-mode .transcript-header,
+body.focus-mode .upload-drawer {
+  display: none !important;
+}
+
+body.focus-mode .app-container {
+  padding: 0 !important;
+}
+
+body.focus-mode .transcript-container {
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+body.focus-mode .transcript-scroll {
+  padding: 10px 16px !important;
+}
+
+@media (max-width: 768px) {
+  body.focus-mode .transcript-scroll {
+    padding: 8px !important;
+  }
+}
+
+.exit-focus-btn {
+  display: none;
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  background: var(--accent-primary);
+  color: #000;
+  border: none;
+  border-radius: 100px;
+  padding: 6px 16px;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 12px;
+  z-index: 9999;
+  box-shadow: 0 4px 15px var(--accent-glow);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.exit-focus-btn:active {
+  transform: scale(0.95);
+}
+
+body.focus-mode .exit-focus-btn {
+  display: block;
 }

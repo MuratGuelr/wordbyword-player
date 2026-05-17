@@ -27,6 +27,7 @@ let audioFileLoaded = false;
 let lastTriggerJump = null;
 let lastTriggerToggle = null;
 let remoteIsPlaying = false; // Used to track play state on remote
+let playTimeout = null; // Delay before playing when a segment is tapped
 
 // DOM Elements
 const authSection = document.getElementById('auth-section');
@@ -38,11 +39,30 @@ const userAvatar = document.getElementById('user-avatar');
 
 const drawer = document.getElementById('upload-drawer');
 const toggleDrawerBtn = document.getElementById('toggle-drawer-btn');
+const fullscreenBtn = document.getElementById('fullscreen-btn');
+const focusBtn = document.getElementById('focus-btn');
+const exitFocusBtn = document.getElementById('exit-focus-btn');
 const emptyState = document.getElementById('empty-state');
 const cuelist = document.getElementById('cuelist');
 const syncStatus = document.getElementById('sync-status');
 const roleBadge = document.getElementById('role-badge');
 const playingFilename = document.getElementById('playing-filename');
+
+fullscreenBtn.addEventListener('click', () => {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen().catch(err => console.log(err));
+  } else {
+    document.exitFullscreen();
+  }
+});
+
+focusBtn.addEventListener('click', () => {
+  document.body.classList.add('focus-mode');
+});
+
+exitFocusBtn.addEventListener('click', () => {
+  document.body.classList.remove('focus-mode');
+});
 
 const audio = document.getElementById('audio-player');
 const progressFill = document.getElementById('progress-fill');
@@ -293,18 +313,25 @@ function mergeSentences(cuesList) {
 function requestJump(time) {
   if (isHost) {
     audio.currentTime = time;
-    audio.play();
+    if (playTimeout) clearTimeout(playTimeout);
+    playTimeout = setTimeout(() => {
+      audio.play().catch(e => console.log(e));
+      if (currentUser) update(ref(db, `users/${currentUser.uid}/session/state`), { isPlaying: true });
+    }, 350);
   }
   if (currentUser) {
     update(ref(db, `users/${currentUser.uid}/session/state`), {
       currentTime: time,
-      isPlaying: true,
       triggerJump: serverTimestamp()
     });
   }
 }
 
 function togglePlaySync() {
+  if (playTimeout) {
+    clearTimeout(playTimeout);
+    playTimeout = null;
+  }
   if (isHost) {
     if (audio.paused) audio.play();
     else audio.pause();
@@ -447,7 +474,10 @@ function listenToSession() {
         lastTriggerJump = state.triggerJump;
         if (isHost && audioFileLoaded) {
           audio.currentTime = state.currentTime;
-          audio.play().catch(e => console.log("Play prevented", e));
+          if (playTimeout) clearTimeout(playTimeout);
+          playTimeout = setTimeout(() => {
+            audio.play().catch(e => console.log("Play prevented", e));
+          }, 350);
         }
       }
       
