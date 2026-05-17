@@ -259,20 +259,21 @@ function buildList() {
       cuelist.appendChild(el);
     });
   } else {
-    const prose = document.createElement('div');
-    prose.className = 'prose';
-    let lastTs = -999;
     cues.forEach((c, ci) => {
       const dur = c.end - c.start || 1;
       const words = c.text.trim().split(/\s+/).filter(Boolean);
-      if (c.start - lastTs >= 8) {
-        const tsSpan = document.createElement("span");
-        tsSpan.className = "w-ts";
-        tsSpan.textContent = ft(c.start);
-        prose.appendChild(tsSpan);
-        prose.appendChild(document.createTextNode(" "));
-        lastTs = c.start;
-      }
+      
+      const el = document.createElement('div');
+      el.className = 'seg';
+      el.dataset.i = ci;
+      
+      const timeDiv = document.createElement('div');
+      timeDiv.className = 'seg-time';
+      timeDiv.textContent = ft(c.start);
+      
+      const textDiv = document.createElement('div');
+      textDiv.className = 'seg-text';
+      
       words.forEach((w, wi) => {
         const t = c.start + (wi / words.length) * dur;
         const sp = document.createElement("span");
@@ -280,18 +281,32 @@ function buildList() {
         sp.dataset.t = t;
         sp.dataset.ci = ci;
         sp.textContent = w;
-        sp.addEventListener('click', () => {
+        sp.addEventListener('click', (e) => {
+          e.stopPropagation();
           if (sp.classList.contains('active')) {
             togglePlaySync();
           } else {
             requestJump(t);
           }
         });
-        prose.appendChild(sp);
-        prose.appendChild(document.createTextNode(" "));
+        textDiv.appendChild(sp);
+        textDiv.appendChild(document.createTextNode(" "));
       });
+      
+      el.appendChild(timeDiv);
+      el.appendChild(textDiv);
+      
+      el.addEventListener('click', () => {
+         const firstSp = textDiv.querySelector('.w-word');
+         if (firstSp && firstSp.classList.contains('active')) {
+            togglePlaySync();
+         } else {
+            requestJump(c.start);
+         }
+      });
+      
+      cuelist.appendChild(el);
     });
-    cuelist.appendChild(prose);
   }
 }
 
@@ -418,7 +433,13 @@ function syncCurrentSeg(time) {
     if (best && !best.classList.contains('active')) {
       document.querySelectorAll('.w-word').forEach(w => w.classList.remove('active'));
       best.classList.add('active');
-      best.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      
+      const parentSeg = best.closest('.seg');
+      if (parentSeg && !parentSeg.classList.contains('active')) {
+        document.querySelectorAll('.seg').forEach(s => s.classList.remove('active'));
+        parentSeg.classList.add('active');
+        parentSeg.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
     }
   }
 }

@@ -831,9 +831,30 @@ header h1 {
 /* --- FOCUS MODE --- */
 body.focus-mode .glass-header,
 body.focus-mode .player-container,
-body.focus-mode .transcript-header,
 body.focus-mode .upload-drawer {
   display: none !important;
+}
+
+body.focus-mode .search-box {
+  display: none !important;
+}
+
+body.focus-mode .transcript-header {
+  border: none !important;
+  padding: 0 !important;
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 9999;
+  background: transparent !important;
+  width: auto;
+}
+
+body.focus-mode .mode-toggles {
+  background: var(--glass-bg);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
 }
 
 body.focus-mode .app-container {
@@ -848,12 +869,12 @@ body.focus-mode .transcript-container {
 }
 
 body.focus-mode .transcript-scroll {
-  padding: 10px 16px !important;
+  padding: 60px 16px 10px !important;
 }
 
 @media (max-width: 768px) {
   body.focus-mode .transcript-scroll {
-    padding: 8px !important;
+    padding: 60px 8px 8px !important;
   }
 }
 
