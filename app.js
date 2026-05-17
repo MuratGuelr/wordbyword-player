@@ -57,6 +57,28 @@ async function loadAudio() {
     return null;
   }
 }
+
+async function saveTranscriptData(name, text) {
+  try {
+    const db = await initDB();
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    store.put({ name, text }, 'savedTranscript');
+  } catch(e) {}
+}
+
+async function loadTranscriptData() {
+  try {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.get('savedTranscript');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  } catch(e) { return null; }
+}
 // -----------------------------------------
 
 // State
@@ -217,12 +239,24 @@ loadAudio().then(f => {
   }
 });
 
+// Try to load saved transcript on startup
+loadTranscriptData().then(data => {
+  if (data && data.text) {
+    parseTranscript(data.text);
+    dzText.classList.add('loaded');
+    dzText.querySelector('p').innerHTML = `<strong>${data.name}</strong><br>${cues.length} segments (Local)`;
+  }
+});
+
 function handleText(f) {
   const r = new FileReader();
   r.onload = (e) => {
-    parseTranscript(e.target.result);
+    const rawText = e.target.result;
+    parseTranscript(rawText);
     dzText.classList.add('loaded');
     dzText.querySelector('p').innerHTML = `<strong>${f.name}</strong><br>${cues.length} segments`;
+    
+    saveTranscriptData(f.name, rawText);
     
     if (currentUser) {
       set(ref(db, `users/${currentUser.uid}/session/cues`), JSON.stringify(cues));
