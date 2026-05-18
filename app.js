@@ -107,6 +107,7 @@ const toggleDrawerBtn = document.getElementById('toggle-drawer-btn');
 const fullscreenBtn = document.getElementById('fullscreen-btn');
 const focusBtn = document.getElementById('focus-btn');
 const exitFocusBtn = document.getElementById('exit-focus-btn');
+const focusPlayBtn = document.getElementById('focus-play-btn');
 const emptyState = document.getElementById('empty-state');
 const cuelist = document.getElementById('cuelist');
 const syncStatus = document.getElementById('sync-status');
@@ -455,6 +456,7 @@ function togglePlaySync() {
 }
 
 btnPlayPause.addEventListener('click', togglePlaySync);
+focusPlayBtn.addEventListener('click', togglePlaySync);
 
 document.getElementById('btn-skip-back').addEventListener('click', () => requestJump(Math.max(0, audio.currentTime - 5)));
 document.getElementById('btn-skip-fwd').addEventListener('click', () => requestJump(Math.min(audio.duration || 0, audio.currentTime + 5)));
@@ -474,6 +476,8 @@ audio.addEventListener('timeupdate', () => {
 audio.addEventListener('play', () => { 
   iconPlay.classList.add('hidden'); 
   iconPause.classList.remove('hidden');
+  focusPlayBtn.querySelector('.focus-icon-play').style.display = 'none';
+  focusPlayBtn.querySelector('.focus-icon-pause').style.display = 'block';
   remoteIsPlaying = true;
   if (currentUser && isHost) update(ref(db, `users/${currentUser.uid}/session/state`), { isPlaying: true });
 });
@@ -481,6 +485,8 @@ audio.addEventListener('play', () => {
 audio.addEventListener('pause', () => { 
   iconPlay.classList.remove('hidden'); 
   iconPause.classList.add('hidden');
+  focusPlayBtn.querySelector('.focus-icon-play').style.display = 'block';
+  focusPlayBtn.querySelector('.focus-icon-pause').style.display = 'none';
   remoteIsPlaying = false;
   if (currentUser && isHost) update(ref(db, `users/${currentUser.uid}/session/state`), { isPlaying: false });
 });
@@ -575,9 +581,13 @@ function listenToSession() {
           if (state.isPlaying) {
             iconPlay.classList.add('hidden');
             iconPause.classList.remove('hidden');
+            focusPlayBtn.querySelector('.focus-icon-play').style.display = 'none';
+            focusPlayBtn.querySelector('.focus-icon-pause').style.display = 'block';
           } else {
             iconPlay.classList.remove('hidden');
             iconPause.classList.add('hidden');
+            focusPlayBtn.querySelector('.focus-icon-play').style.display = 'block';
+            focusPlayBtn.querySelector('.focus-icon-pause').style.display = 'none';
           }
         }
       }

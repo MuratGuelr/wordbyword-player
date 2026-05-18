@@ -904,3 +904,43 @@ body.focus-mode .transcript-scroll {
 body.focus-mode .exit-focus-btn {
   display: block;
 }
+
+.focus-play-btn {
+  display: none;
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 64px;
+  height: 64px;
+  z-index: 9999;
+  box-shadow: 0 4px 20px var(--accent-glow);
+  cursor: pointer;
+  transition: all 0.2s;
+  align-items: center;
+  justify-content: center;
+}
+
+body.focus-mode .focus-play-btn {
+  display: flex;
+}
+
+.focus-play-btn:active {
+  transform: translateX(-50%) scale(0.95);
+}
+
+@media (max-width: 950px) and (orientation: landscape) {
+  .focus-play-btn {
+    left: auto;
+    right: 32px;
+    bottom: 32px;
+    transform: none;
+  }
+  .focus-play-btn:active {
+    transform: scale(0.95);
+  }
+}
