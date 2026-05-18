@@ -43,7 +43,7 @@
             </svg>
             Sign in
           </button>
-          <div id="user-profile" class="user-profile hidden">
+          <div id="user-profile" class="user-profile hidden" style="cursor: pointer;" title="Ayarlar">
             <img id="user-avatar" src="" alt="Avatar" />
             <span id="user-name"></span>
             <button id="logout-btn" class="btn btn-ghost btn-sm">Logout</button>
@@ -139,6 +139,28 @@
       </div>
     </div>
 
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settings-modal" class="modal-overlay hidden">
+    <div class="modal-content glass-panel">
+      <div class="modal-header">
+        <h2>Ayarlar</h2>
+        <button id="close-settings-btn" class="btn btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+      </div>
+      <div class="modal-body">
+        <div class="setting-row">
+          <div class="setting-info">
+            <h3>Ekranı Açık Tut</h3>
+            <p>Siz okurken telefonun ekranının kapanmasını engeller.</p>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="setting-wakelock" checked>
+            <span class="slider round"></span>
+          </label>
+        </div>
+      </div>
+    </div>
   </div>
 
   <button id="focus-play-btn" class="focus-play-btn" title="Play/Pause">

@@ -16,6 +16,36 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
 
+// --- Wake Lock API (Keep Screen Awake) ---
+let wakeLock = null;
+let isRequestingWakeLock = false;
+let wakeLockEnabled = true; // controlled by settings toggle
+
+async function requestWakeLock() {
+  if (!wakeLockEnabled || wakeLock || isRequestingWakeLock || !('wakeLock' in navigator)) return;
+  isRequestingWakeLock = true;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => { wakeLock = null; });
+  } catch (err) {
+    console.error('Wake Lock error:', err);
+  } finally {
+    isRequestingWakeLock = false;
+  }
+}
+
+async function releaseWakeLock() {
+  if (wakeLock) {
+    await wakeLock.release();
+    wakeLock = null;
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') requestWakeLock();
+});
+// -----------------------------------------
+
 // --- IndexedDB for Local Audio Storage ---
 const DB_NAME = 'WordByWordDB';
 const STORE_NAME = 'audioStore';
@@ -113,6 +143,37 @@ const cuelist = document.getElementById('cuelist');
 const syncStatus = document.getElementById('sync-status');
 const roleBadge = document.getElementById('role-badge');
 const playingFilename = document.getElementById('playing-filename');
+
+// --- Settings Modal ---
+const settingsModal = document.getElementById('settings-modal');
+const closeSettingsBtn = document.getElementById('close-settings-btn');
+const settingWakeLock = document.getElementById('setting-wakelock');
+
+userProfile.addEventListener('click', (e) => {
+  if (e.target.closest('#logout-btn')) return; // don't open on logout click
+  settingsModal.classList.remove('hidden');
+});
+
+closeSettingsBtn.addEventListener('click', () => {
+  settingsModal.classList.add('hidden');
+});
+
+settingsModal.addEventListener('click', (e) => {
+  if (e.target === settingsModal) settingsModal.classList.add('hidden');
+});
+
+settingWakeLock.addEventListener('change', () => {
+  wakeLockEnabled = settingWakeLock.checked;
+  if (wakeLockEnabled) {
+    requestWakeLock();
+  } else {
+    releaseWakeLock();
+  }
+});
+
+// Activate wake lock on first interaction
+document.addEventListener('click', requestWakeLock, { once: false });
+// --- End Settings Modal ---
 
 fullscreenBtn.addEventListener('click', () => {
   if (!document.fullscreenElement) {
