@@ -27,6 +27,16 @@
       </div>
 
       <div class="header-actions">
+        <!-- New Cloud Buttons -->
+        <button id="btn-save-cloud" class="btn hidden" style="margin-right: 8px; border-radius: 8px; padding: 6px 12px; font-weight: 500; background: #ffffff; color: #111; box-shadow: 0 4px 12px rgba(66, 133, 244, 0.3); transition: all 0.2s;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="vertical-align: text-bottom;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+          Save
+        </button>
+        <button id="btn-saved-sessions" class="btn hidden" style="margin-right: 12px; border-radius: 8px; padding: 6px 12px; font-weight: 500; background: rgba(255, 255, 255, 0.1); color: #fff; transition: all 0.2s;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="vertical-align: text-bottom;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+          Library
+        </button>
+
         <button id="focus-btn" class="btn btn-icon" style="margin-right: 8px;" title="Focus Mode">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
         </button>
@@ -159,6 +169,35 @@
             <span class="slider round"></span>
           </label>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Saved Sessions Modal -->
+  <div id="saved-sessions-modal" class="modal-overlay hidden">
+    <div class="modal-content glass-panel" style="max-width: 500px;">
+      <div class="modal-header">
+        <h2>Saved Sessions</h2>
+        <button id="close-saved-btn" class="btn btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 0.85rem; opacity: 0.7; margin-bottom: 12px;">You can save up to 5 sessions to the cloud.</p>
+        <div id="saved-sessions-list" style="display: flex; flex-direction: column; gap: 10px;">
+          <!-- Items will be injected here -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Alert Modal -->
+  <div id="custom-alert-modal" class="modal-overlay hidden">
+    <div class="modal-content glass-panel" style="max-width: 400px; text-align: center;">
+      <div class="modal-header" style="border-bottom: none; justify-content: center; padding-bottom: 0;">
+        <h2 id="custom-alert-title" style="font-size: 20px; color: var(--accent-primary);">Uyarı</h2>
+      </div>
+      <div class="modal-body">
+        <p id="custom-alert-message" style="margin: 16px 0 24px; font-size: 15px; color: var(--text-main); line-height: 1.5;"></p>
+        <button id="custom-alert-btn" class="btn btn-primary" style="margin: 0 auto; width: 100%;">Anladım</button>
       </div>
     </div>
   </div>

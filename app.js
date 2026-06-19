@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
-import { getDatabase, ref, set, onValue, update, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
-
+import { getDatabase, ref, set, onValue, update, serverTimestamp, remove } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
+import { getStorage, ref as sRef, uploadString, deleteObject, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-storage.js";
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -15,6 +15,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
+const storage = getStorage(app);
 
 // --- Wake Lock API (Keep Screen Awake) ---
 let wakeLock = null;
@@ -67,7 +68,7 @@ async function saveAudio(file) {
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
     store.put(file, 'savedAudio');
-  } catch(e) {
+  } catch (e) {
     console.error("Could not save audio to DB", e);
   }
 }
@@ -82,7 +83,7 @@ async function loadAudio() {
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
-  } catch(e) {
+  } catch (e) {
     console.error(e);
     return null;
   }
@@ -94,7 +95,7 @@ async function saveTranscriptData(name, text) {
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
     store.put({ name, text }, 'savedTranscript');
-  } catch(e) {}
+  } catch (e) { }
 }
 
 async function loadTranscriptData() {
@@ -107,7 +108,7 @@ async function loadTranscriptData() {
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
-  } catch(e) { return null; }
+  } catch (e) { return null; }
 }
 // -----------------------------------------
 
@@ -210,11 +211,15 @@ onAuthStateChanged(auth, (user) => {
     userName.textContent = user.displayName.split(' ')[0];
     userAvatar.src = user.photoURL;
     syncStatus.innerHTML = '<div class="pulse-dot"></div> Connected to Sync';
+    document.getElementById('btn-saved-sessions').classList.remove('hidden');
     listenToSession();
+    updateSaveCloudBtnVisibility();
   } else {
     loginBtn.classList.remove('hidden');
     userProfile.classList.add('hidden');
     syncStatus.innerHTML = 'Please log in to sync';
+    document.getElementById('btn-saved-sessions').classList.add('hidden');
+    document.getElementById('btn-save-cloud').classList.add('hidden');
     cues = [];
     buildList();
   }
@@ -280,9 +285,10 @@ function handleAudio(f) {
   dzAudio.classList.add('loaded');
   dzAudio.querySelector('p').innerHTML = `<strong>${f.name}</strong><br>Ready to play`;
   playingFilename.textContent = f.name;
-  
+
   saveAudio(f);
-  
+  updateSaveCloudBtnVisibility();
+
   if (currentUser) {
     update(ref(db, `users/${currentUser.uid}/session/state`), { fileName: f.name });
   }
@@ -317,9 +323,10 @@ function handleText(f) {
     parseTranscript(rawText);
     dzText.classList.add('loaded');
     dzText.querySelector('p').innerHTML = `<strong>${f.name}</strong><br>${cues.length} segments`;
-    
+
     saveTranscriptData(f.name, rawText);
-    
+    updateSaveCloudBtnVisibility();
+
     if (currentUser) {
       set(ref(db, `users/${currentUser.uid}/session/cues`), JSON.stringify(cues));
     }
@@ -354,7 +361,7 @@ function parseTranscript(raw) {
         }));
         parsed = true;
       }
-    } catch (e) {}
+    } catch (e) { }
   }
   if (!parsed) parseSRT(raw);
   buildList();
@@ -416,18 +423,18 @@ function buildList() {
     cues.forEach((c, ci) => {
       const dur = c.end - c.start || 1;
       const words = c.text.trim().split(/\s+/).filter(Boolean);
-      
+
       const el = document.createElement('div');
       el.className = 'seg';
       el.dataset.i = ci;
-      
+
       const timeDiv = document.createElement('div');
       timeDiv.className = 'seg-time';
       timeDiv.textContent = ft(c.start);
-      
+
       const textDiv = document.createElement('div');
       textDiv.className = 'seg-text';
-      
+
       words.forEach((w, wi) => {
         const t = c.start + (wi / words.length) * dur;
         const sp = document.createElement("span");
@@ -446,19 +453,19 @@ function buildList() {
         textDiv.appendChild(sp);
         textDiv.appendChild(document.createTextNode(" "));
       });
-      
+
       el.appendChild(timeDiv);
       el.appendChild(textDiv);
-      
+
       el.addEventListener('click', () => {
-         const firstSp = textDiv.querySelector('.w-word');
-         if (firstSp && firstSp.classList.contains('active')) {
-            togglePlaySync();
-         } else {
-            requestJump(c.start);
-         }
+        const firstSp = textDiv.querySelector('.w-word');
+        if (firstSp && firstSp.classList.contains('active')) {
+          togglePlaySync();
+        } else {
+          requestJump(c.start);
+        }
       });
-      
+
       cuelist.appendChild(el);
     });
   }
@@ -526,7 +533,7 @@ audio.addEventListener('timeupdate', () => {
   if (isHost) {
     updateProgressUI(audio.currentTime, audio.duration);
     syncCurrentSeg(audio.currentTime);
-    
+
     // Periodically update DB so remote stays somewhat in sync visually
     if (currentUser && Math.random() < 0.2) {
       update(ref(db, `users/${currentUser.uid}/session/state`), { currentTime: audio.currentTime });
@@ -534,8 +541,8 @@ audio.addEventListener('timeupdate', () => {
   }
 });
 
-audio.addEventListener('play', () => { 
-  iconPlay.classList.add('hidden'); 
+audio.addEventListener('play', () => {
+  iconPlay.classList.add('hidden');
   iconPause.classList.remove('hidden');
   focusPlayBtn.querySelector('.focus-icon-play').style.display = 'none';
   focusPlayBtn.querySelector('.focus-icon-pause').style.display = 'block';
@@ -543,8 +550,8 @@ audio.addEventListener('play', () => {
   if (currentUser && isHost) update(ref(db, `users/${currentUser.uid}/session/state`), { isPlaying: true });
 });
 
-audio.addEventListener('pause', () => { 
-  iconPlay.classList.remove('hidden'); 
+audio.addEventListener('pause', () => {
+  iconPlay.classList.remove('hidden');
   iconPause.classList.add('hidden');
   focusPlayBtn.querySelector('.focus-icon-play').style.display = 'block';
   focusPlayBtn.querySelector('.focus-icon-pause').style.display = 'none';
@@ -592,7 +599,7 @@ function syncCurrentSeg(time) {
     if (best && !best.classList.contains('active')) {
       document.querySelectorAll('.w-word').forEach(w => w.classList.remove('active'));
       best.classList.add('active');
-      
+
       const parentSeg = best.closest('.seg');
       if (parentSeg && !parentSeg.classList.contains('active')) {
         document.querySelectorAll('.seg').forEach(s => s.classList.remove('active'));
@@ -606,11 +613,11 @@ function syncCurrentSeg(time) {
 // Firebase Sync Listener
 function listenToSession() {
   const sessionRef = ref(db, `users/${currentUser.uid}/session`);
-  
+
   onValue(sessionRef, (snapshot) => {
     if (!snapshot.exists()) return;
     const data = snapshot.val();
-    
+
     // Only load cues from DB if we are remote
     if (data.cues && !isHost) {
       const parsedCues = JSON.parse(data.cues);
@@ -619,15 +626,15 @@ function listenToSession() {
         buildList();
       }
     }
-    
+
     if (data.state) {
       const state = data.state;
-      
+
       if (state.fileName && !isHost) {
         playingFilename.textContent = state.fileName;
         setHostMode(false);
       }
-      
+
       if (state.mode && state.mode !== mode) {
         mode = state.mode;
         document.querySelectorAll('.mode-btn').forEach(b => {
@@ -635,7 +642,7 @@ function listenToSession() {
         });
         buildList();
       }
-      
+
       if (state.isPlaying !== undefined) {
         remoteIsPlaying = state.isPlaying;
         if (!isHost) {
@@ -652,7 +659,7 @@ function listenToSession() {
           }
         }
       }
-      
+
       // If triggerJump changed, someone requested a jump
       if (state.triggerJump && state.triggerJump !== lastTriggerJump) {
         lastTriggerJump = state.triggerJump;
@@ -664,7 +671,7 @@ function listenToSession() {
           }, 350);
         }
       }
-      
+
       // If triggerPlayToggle changed, toggle play/pause
       if (state.triggerPlayToggle && state.triggerPlayToggle !== lastTriggerToggle) {
         lastTriggerToggle = state.triggerPlayToggle;
@@ -673,7 +680,7 @@ function listenToSession() {
           else audio.pause();
         }
       }
-      
+
       // If we are remote, just sync UI to current time
       if (!isHost && state.currentTime !== undefined) {
         syncCurrentSeg(state.currentTime);
@@ -706,4 +713,291 @@ function escapeHTML(str) {
   return str.replace(/[&<>'"]/g, tag => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
   }[tag]));
+}
+
+// --- Cloud Save / Load Logic ---
+const btnSaveCloud = document.getElementById('btn-save-cloud');
+const btnSavedSessions = document.getElementById('btn-saved-sessions');
+const savedSessionsModal = document.getElementById('saved-sessions-modal');
+const closeSavedBtn = document.getElementById('close-saved-btn');
+const savedSessionsList = document.getElementById('saved-sessions-list');
+
+function updateSaveCloudBtnVisibility() {
+  if (currentUser) {
+    btnSaveCloud.classList.remove('hidden');
+    if (!(isHost && audioFileLoaded && cues.length > 0)) {
+      btnSaveCloud.style.opacity = '0.5';
+      btnSaveCloud.title = 'Ses ve metin yükledikten sonra kaydedebilirsiniz.';
+    } else {
+      btnSaveCloud.style.opacity = '1';
+      btnSaveCloud.title = 'Buluta Kaydet';
+    }
+  } else {
+    btnSaveCloud.classList.add('hidden');
+  }
+}
+
+btnSavedSessions.addEventListener('click', () => {
+  savedSessionsModal.classList.remove('hidden');
+  loadSavedSessionsList();
+});
+
+closeSavedBtn.addEventListener('click', () => {
+  savedSessionsModal.classList.add('hidden');
+});
+
+savedSessionsModal.addEventListener('click', (e) => {
+  if (e.target === savedSessionsModal) savedSessionsModal.classList.add('hidden');
+});
+
+// Custom Alert Logic
+const customAlertModal = document.getElementById('custom-alert-modal');
+const customAlertTitle = document.getElementById('custom-alert-title');
+const customAlertMessage = document.getElementById('custom-alert-message');
+const customAlertBtn = document.getElementById('custom-alert-btn');
+
+function showCustomAlert(message, title = 'Uyarı') {
+  customAlertTitle.textContent = title;
+  customAlertMessage.textContent = message;
+  customAlertModal.classList.remove('hidden');
+}
+
+customAlertBtn.addEventListener('click', () => {
+  customAlertModal.classList.add('hidden');
+});
+
+async function sha1(str) {
+  const buf = new TextEncoder().encode(str);
+  const hash = await crypto.subtle.digest('SHA-1', buf);
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+btnSaveCloud.addEventListener('click', async () => {
+  if (!currentUser) return;
+  if (!isHost || !audioFileLoaded || cues.length === 0) {
+    showCustomAlert("Kaydetmek için önce hem bir ses dosyası (MP3) hem de bir metin dosyası yüklemelisiniz!", "Eksik Dosya");
+    return;
+  }
+  
+  const originalText = btnSaveCloud.textContent;
+  btnSaveCloud.textContent = "Checking...";
+  btnSaveCloud.disabled = true;
+
+  try {
+    // Check max sessions
+    const sessionsRef = ref(db, `users/${currentUser.uid}/saved_sessions`);
+    const snap = await new Promise(resolve => onValue(sessionsRef, resolve, { onlyOnce: true }));
+    let count = 0;
+    if (snap.exists()) {
+      count = Object.keys(snap.val()).length;
+    }
+    if (count >= 5) {
+      showCustomAlert("En fazla 5 adet oturum kaydedebilirsiniz. Lütfen yenisini kaydetmeden önce eskilerden birini silin.", "Limit Doldu");
+      btnSaveCloud.textContent = originalText;
+      btnSaveCloud.disabled = false;
+      return;
+    }
+
+    btnSaveCloud.textContent = "Uploading Audio...";
+
+    // Get audio file
+    const audioFile = await loadAudio();
+    if (!audioFile) throw new Error("Audio file not found in local storage.");
+
+    // Upload to Cloudinary
+    const formData = new FormData();
+    formData.append('file', audioFile);
+    formData.append('upload_preset', import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
+
+    const cloudRes = await fetch(`https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/video/upload`, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!cloudRes.ok) throw new Error("Cloudinary upload failed.");
+    const cloudData = await cloudRes.json();
+    const audioUrl = cloudData.secure_url;
+    const audioPublicId = cloudData.public_id;
+
+    btnSaveCloud.textContent = "Uploading Transcript...";
+
+    // Get transcript data
+    const transcriptData = await loadTranscriptData();
+    if (!transcriptData) throw new Error("Transcript not found.");
+
+    // Upload to Firebase Storage
+    const timestamp = Date.now();
+    const transcriptRef = sRef(storage, `transcripts/${currentUser.uid}/${timestamp}_${transcriptData.name}`);
+    await uploadString(transcriptRef, transcriptData.text);
+    const transcriptUrl = await getDownloadURL(transcriptRef);
+
+    btnSaveCloud.textContent = "Saving...";
+
+    // Save to Realtime Database
+    const newSessionRef = ref(db, `users/${currentUser.uid}/saved_sessions/${timestamp}`);
+    await set(newSessionRef, {
+      id: timestamp.toString(),
+      name: playingFilename.textContent,
+      audioUrl,
+      audioPublicId,
+      transcriptUrl,
+      createdAt: timestamp
+    });
+
+    btnSaveCloud.textContent = "Saved!";
+    setTimeout(() => {
+      btnSaveCloud.textContent = originalText;
+      btnSaveCloud.disabled = false;
+    }, 2000);
+
+  } catch (err) {
+    console.error(err);
+    showCustomAlert("Kaydetme işlemi sırasında bir hata oluştu: " + err.message, "Hata");
+    btnSaveCloud.textContent = "Error!";
+    setTimeout(() => {
+      btnSaveCloud.textContent = originalText;
+      btnSaveCloud.disabled = false;
+    }, 2000);
+  }
+});
+
+function loadSavedSessionsList() {
+  if (!currentUser) return;
+
+  savedSessionsList.innerHTML = '<div style="text-align: center; opacity: 0.7; padding: 20px;">Loading...</div>';
+
+  const sessionsRef = ref(db, `users/${currentUser.uid}/saved_sessions`);
+  onValue(sessionsRef, (snapshot) => {
+    savedSessionsList.innerHTML = '';
+    if (!snapshot.exists()) {
+      savedSessionsList.innerHTML = '<div style="text-align: center; opacity: 0.7; padding: 20px;">No saved sessions found.</div>';
+      return;
+    }
+
+    const sessions = snapshot.val();
+    Object.values(sessions).sort((a, b) => b.createdAt - a.createdAt).forEach(session => {
+      const el = document.createElement('div');
+      el.className = 'glass-panel';
+      el.style.padding = '12px';
+      el.style.display = 'flex';
+      el.style.justifyContent = 'space-between';
+      el.style.alignItems = 'center';
+
+      const info = document.createElement('div');
+      const date = new Date(session.createdAt).toLocaleDateString();
+      info.innerHTML = `<strong>${escapeHTML(session.name)}</strong><br><span style="font-size:0.8rem;opacity:0.7">${date}</span>`;
+
+      const actions = document.createElement('div');
+      actions.style.display = 'flex';
+      actions.style.gap = '8px';
+
+      const loadBtn = document.createElement('button');
+      loadBtn.className = 'btn btn-primary btn-sm';
+      loadBtn.textContent = 'Load';
+      loadBtn.onclick = () => loadCloudSession(session);
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'btn btn-secondary btn-sm';
+      delBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path></svg>';
+      delBtn.onclick = () => deleteCloudSession(session, delBtn);
+
+      actions.appendChild(loadBtn);
+      actions.appendChild(delBtn);
+
+      el.appendChild(info);
+      el.appendChild(actions);
+      savedSessionsList.appendChild(el);
+    });
+  });
+}
+
+async function loadCloudSession(session) {
+  try {
+    savedSessionsModal.classList.add('hidden');
+
+    // Load Audio
+    audio.src = session.audioUrl;
+    audio.load();
+    audioFileLoaded = true;
+    setHostMode(true);
+    playingFilename.textContent = session.name + ' (Cloud)';
+
+    // Update visual dropzones
+    dzAudio.classList.add('loaded');
+    dzAudio.querySelector('p').innerHTML = `<strong>${session.name}</strong><br>Loaded from Cloud`;
+
+    // Load Transcript
+    const res = await fetch(session.transcriptUrl);
+    if (!res.ok) throw new Error("Could not fetch transcript.");
+    const rawText = await res.text();
+
+    parseTranscript(rawText);
+    dzText.classList.add('loaded');
+    dzText.querySelector('p').innerHTML = `<strong>${session.name}</strong><br>${cues.length} segments (Cloud)`;
+
+    updateSaveCloudBtnVisibility();
+
+    // Update DB to sync remote users
+    if (currentUser) {
+      await update(ref(db, `users/${currentUser.uid}/session/state`), { fileName: session.name + ' (Cloud)' });
+      await set(ref(db, `users/${currentUser.uid}/session/cues`), JSON.stringify(cues));
+    }
+  } catch (err) {
+    console.error(err);
+    showCustomAlert("Bulut oturumu yüklenirken hata oluştu: " + err.message, "Hata");
+  }
+}
+
+async function deleteCloudSession(session, btn) {
+  if (!confirm(`Are you sure you want to delete ${session.name}?`)) return;
+
+  const originalHtml = btn.innerHTML;
+  btn.innerHTML = '...';
+  btn.disabled = true;
+
+  try {
+    // 1. Delete from Cloudinary
+    if (session.audioPublicId) {
+      const ts = Math.floor(Date.now() / 1000);
+      const strToSign = `public_id=${session.audioPublicId}&timestamp=${ts}${import.meta.env.VITE_CLOUDINARY_API_SECRET}`;
+      const signature = await sha1(strToSign);
+
+      const formData = new FormData();
+      formData.append('public_id', session.audioPublicId);
+      formData.append('timestamp', ts);
+      formData.append('signature', signature);
+      formData.append('api_key', import.meta.env.VITE_CLOUDINARY_API_KEY);
+
+      await fetch(`https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/video/destroy`, {
+        method: 'POST',
+        body: formData
+      });
+    }
+
+    // 2. Delete from Firebase Storage
+    if (session.transcriptUrl) {
+      // We need to parse the path from the URL
+      // Firebase storage URLs look like: https://firebasestorage.googleapis.com/v0/b/.../o/transcripts%2Fuserid%2Ffilename?alt=media
+      try {
+        const urlObj = new URL(session.transcriptUrl);
+        let path = urlObj.pathname.split('/o/')[1];
+        if (path) {
+          path = decodeURIComponent(path);
+          const tRef = sRef(storage, path);
+          await deleteObject(tRef);
+        }
+      } catch (e) {
+        console.warn("Could not delete from storage, might be already deleted or invalid url", e);
+      }
+    }
+
+    // 3. Delete from Realtime Database
+    await remove(ref(db, `users/${currentUser.uid}/saved_sessions/${session.id}`));
+
+  } catch (err) {
+    console.error(err);
+    showCustomAlert("Oturum silinirken hata oluştu: " + err.message, "Hata");
+    btn.innerHTML = originalHtml;
+    btn.disabled = false;
+  }
 }
