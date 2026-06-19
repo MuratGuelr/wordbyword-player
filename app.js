@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
-import { getDatabase, ref, set, onValue, update, serverTimestamp, remove } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
-import { getStorage, ref as sRef, uploadString, deleteObject, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-storage.js";
+import { getDatabase, ref, set, onValue, update, serverTimestamp, remove, get } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
+
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -15,7 +15,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
-const storage = getStorage(app);
 
 // --- Wake Lock API (Keep Screen Awake) ---
 let wakeLock = null;
@@ -89,12 +88,12 @@ async function loadAudio() {
   }
 }
 
-async function saveTranscriptData(name, text) {
+async function saveTranscriptData(data) {
   try {
     const db = await initDB();
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
-    store.put({ name, text }, 'savedTranscript');
+    store.put(data, 'savedTranscript');
   } catch (e) { }
 }
 
@@ -208,7 +207,7 @@ onAuthStateChanged(auth, (user) => {
   if (user) {
     loginBtn.classList.add('hidden');
     userProfile.classList.remove('hidden');
-    userName.textContent = user.displayName.split(' ')[0];
+    userName.textContent = user.displayName ? user.displayName.split(' ')[0] : 'User';
     userAvatar.src = user.photoURL;
     syncStatus.innerHTML = '<div class="pulse-dot"></div> Connected to Sync';
     document.getElementById('btn-saved-sessions').classList.remove('hidden');
@@ -324,7 +323,7 @@ function handleText(f) {
     dzText.classList.add('loaded');
     dzText.querySelector('p').innerHTML = `<strong>${f.name}</strong><br>${cues.length} segments`;
 
-    saveTranscriptData(f.name, rawText);
+    saveTranscriptData({ name: f.name, text: rawText });
     updateSaveCloudBtnVisibility();
 
     if (currentUser) {
@@ -727,10 +726,8 @@ function updateSaveCloudBtnVisibility() {
     btnSaveCloud.classList.remove('hidden');
     if (!(isHost && audioFileLoaded && cues.length > 0)) {
       btnSaveCloud.style.opacity = '0.5';
-      btnSaveCloud.title = 'Ses ve metin yükledikten sonra kaydedebilirsiniz.';
     } else {
       btnSaveCloud.style.opacity = '1';
-      btnSaveCloud.title = 'Buluta Kaydet';
     }
   } else {
     btnSaveCloud.classList.add('hidden');
@@ -766,6 +763,48 @@ customAlertBtn.addEventListener('click', () => {
   customAlertModal.classList.add('hidden');
 });
 
+// Custom Prompt Logic
+const customPromptModal = document.getElementById('custom-prompt-modal');
+const customPromptTitle = document.getElementById('custom-prompt-title');
+const customPromptInput = document.getElementById('custom-prompt-input');
+const customPromptSubmit = document.getElementById('custom-prompt-submit');
+const customPromptCancel = document.getElementById('custom-prompt-cancel');
+
+function showCustomPrompt(title, defaultValue = '') {
+  return new Promise((resolve) => {
+    customPromptTitle.textContent = title;
+    customPromptInput.value = defaultValue;
+    customPromptModal.classList.remove('hidden');
+    customPromptInput.focus();
+    customPromptInput.select();
+
+    const cleanup = () => {
+      customPromptSubmit.removeEventListener('click', onSubmit);
+      customPromptCancel.removeEventListener('click', onCancel);
+      customPromptModal.classList.add('hidden');
+    };
+
+    const onSubmit = () => {
+      cleanup();
+      resolve(customPromptInput.value.trim());
+    };
+
+    const onCancel = () => {
+      cleanup();
+      resolve(null);
+    };
+
+    customPromptSubmit.addEventListener('click', onSubmit);
+    customPromptCancel.addEventListener('click', onCancel);
+    
+    // Allow pressing Enter to submit
+    customPromptInput.onkeydown = (e) => {
+      if (e.key === 'Enter') onSubmit();
+      if (e.key === 'Escape') onCancel();
+    };
+  });
+}
+
 async function sha1(str) {
   const buf = new TextEncoder().encode(str);
   const hash = await crypto.subtle.digest('SHA-1', buf);
@@ -779,14 +818,16 @@ btnSaveCloud.addEventListener('click', async () => {
     return;
   }
   
+  const videoName = await showCustomPrompt("Lütfen bu kayıt için bir Video Adı girin:", playingFilename.textContent || "Kayıt");
+  if (!videoName) return; // User cancelled
+
   const originalText = btnSaveCloud.textContent;
   btnSaveCloud.textContent = "Checking...";
   btnSaveCloud.disabled = true;
 
   try {
-    // Check max sessions
     const sessionsRef = ref(db, `users/${currentUser.uid}/saved_sessions`);
-    const snap = await new Promise(resolve => onValue(sessionsRef, resolve, { onlyOnce: true }));
+    const snap = await get(sessionsRef);
     let count = 0;
     if (snap.exists()) {
       count = Object.keys(snap.val()).length;
@@ -799,17 +840,14 @@ btnSaveCloud.addEventListener('click', async () => {
     }
 
     btnSaveCloud.textContent = "Uploading Audio...";
-
-    // Get audio file
     const audioFile = await loadAudio();
     if (!audioFile) throw new Error("Audio file not found in local storage.");
 
-    // Upload to Cloudinary
     const formData = new FormData();
     formData.append('file', audioFile);
     formData.append('upload_preset', import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
 
-    const cloudRes = await fetch(`https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/video/upload`, {
+    const cloudRes = await fetch(`https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/auto/upload`, {
       method: 'POST',
       body: formData
     });
@@ -819,51 +857,42 @@ btnSaveCloud.addEventListener('click', async () => {
     const audioUrl = cloudData.secure_url;
     const audioPublicId = cloudData.public_id;
 
-    btnSaveCloud.textContent = "Uploading Transcript...";
+    btnSaveCloud.textContent = "Saving to Database...";
 
-    // Get transcript data
-    const transcriptData = await loadTranscriptData();
-    if (!transcriptData) throw new Error("Transcript not found.");
-
-    // Upload to Firebase Storage
     const timestamp = Date.now();
-    const transcriptRef = sRef(storage, `transcripts/${currentUser.uid}/${timestamp}_${transcriptData.name}`);
-    await uploadString(transcriptRef, transcriptData.text);
-    const transcriptUrl = await getDownloadURL(transcriptRef);
+    const transcriptData = await loadTranscriptData();
+    
+    // Save transcript text to Realtime Database
+    const newTranscriptRef = ref(db, `users/${currentUser.uid}/saved_transcripts/${timestamp}`);
+    await set(newTranscriptRef, {
+      text: transcriptData.text,
+      name: transcriptData.name || "transcript.txt"
+    });
 
-    btnSaveCloud.textContent = "Saving...";
-
-    // Save to Realtime Database
+    // Save metadata to Realtime Database
     const newSessionRef = ref(db, `users/${currentUser.uid}/saved_sessions/${timestamp}`);
     await set(newSessionRef, {
       id: timestamp.toString(),
-      name: playingFilename.textContent,
+      name: videoName,
       audioUrl,
       audioPublicId,
-      transcriptUrl,
-      createdAt: timestamp
+      timestamp
     });
 
-    btnSaveCloud.textContent = "Saved!";
-    setTimeout(() => {
-      btnSaveCloud.textContent = originalText;
-      btnSaveCloud.disabled = false;
-    }, 2000);
+    showCustomAlert("Kayıt başarıyla tamamlandı!", "Başarılı");
+    btnSaveCloud.textContent = originalText;
+    btnSaveCloud.disabled = false;
 
   } catch (err) {
     console.error(err);
     showCustomAlert("Kaydetme işlemi sırasında bir hata oluştu: " + err.message, "Hata");
-    btnSaveCloud.textContent = "Error!";
-    setTimeout(() => {
-      btnSaveCloud.textContent = originalText;
-      btnSaveCloud.disabled = false;
-    }, 2000);
+    btnSaveCloud.textContent = originalText;
+    btnSaveCloud.disabled = false;
   }
 });
 
 function loadSavedSessionsList() {
   if (!currentUser) return;
-
   savedSessionsList.innerHTML = '<div style="text-align: center; opacity: 0.7; padding: 20px;">Loading...</div>';
 
   const sessionsRef = ref(db, `users/${currentUser.uid}/saved_sessions`);
@@ -875,16 +904,16 @@ function loadSavedSessionsList() {
     }
 
     const sessions = snapshot.val();
-    Object.values(sessions).sort((a, b) => b.createdAt - a.createdAt).forEach(session => {
+    Object.values(sessions).sort((a, b) => b.timestamp - a.timestamp).forEach(session => {
       const el = document.createElement('div');
       el.className = 'glass-panel';
       el.style.padding = '12px';
       el.style.display = 'flex';
       el.style.justifyContent = 'space-between';
       el.style.alignItems = 'center';
-
+      
       const info = document.createElement('div');
-      const date = new Date(session.createdAt).toLocaleDateString();
+      const date = new Date(session.timestamp).toLocaleDateString();
       info.innerHTML = `<strong>${escapeHTML(session.name)}</strong><br><span style="font-size:0.8rem;opacity:0.7">${date}</span>`;
 
       const actions = document.createElement('div');
@@ -903,7 +932,6 @@ function loadSavedSessionsList() {
 
       actions.appendChild(loadBtn);
       actions.appendChild(delBtn);
-
       el.appendChild(info);
       el.appendChild(actions);
       savedSessionsList.appendChild(el);
@@ -915,29 +943,35 @@ async function loadCloudSession(session) {
   try {
     savedSessionsModal.classList.add('hidden');
 
-    // Load Audio
-    audio.src = session.audioUrl;
+    const res = await fetch(session.audioUrl);
+    const audioBlob = await res.blob();
+    
+    // Download Transcript from Realtime Database
+    const transcriptRef = ref(db, `users/${currentUser.uid}/saved_transcripts/${session.id}`);
+    const transcriptSnap = await get(transcriptRef);
+    if (!transcriptSnap.exists()) throw new Error("Metin dosyası (transcript) veritabanında bulunamadı!");
+    
+    const transcriptData = transcriptSnap.val();
+    
+    // Save to local IndexedDB to play
+    await saveAudio(audioBlob);
+    await saveTranscriptData({ name: transcriptData.name, text: transcriptData.text });
+    
+    // UI Update
+    audio.src = URL.createObjectURL(audioBlob);
     audio.load();
     audioFileLoaded = true;
     setHostMode(true);
     playingFilename.textContent = session.name + ' (Cloud)';
-
-    // Update visual dropzones
     dzAudio.classList.add('loaded');
     dzAudio.querySelector('p').innerHTML = `<strong>${session.name}</strong><br>Loaded from Cloud`;
 
-    // Load Transcript
-    const res = await fetch(session.transcriptUrl);
-    if (!res.ok) throw new Error("Could not fetch transcript.");
-    const rawText = await res.text();
-
-    parseTranscript(rawText);
+    parseTranscript(transcriptData.text);
     dzText.classList.add('loaded');
-    dzText.querySelector('p').innerHTML = `<strong>${session.name}</strong><br>${cues.length} segments (Cloud)`;
+    dzText.querySelector('p').innerHTML = `<strong>${transcriptData.name}</strong><br>${cues.length} segments (Cloud)`;
 
     updateSaveCloudBtnVisibility();
 
-    // Update DB to sync remote users
     if (currentUser) {
       await update(ref(db, `users/${currentUser.uid}/session/state`), { fileName: session.name + ' (Cloud)' });
       await set(ref(db, `users/${currentUser.uid}/session/cues`), JSON.stringify(cues));
@@ -974,24 +1008,11 @@ async function deleteCloudSession(session, btn) {
       });
     }
 
-    // 2. Delete from Firebase Storage
-    if (session.transcriptUrl) {
-      // We need to parse the path from the URL
-      // Firebase storage URLs look like: https://firebasestorage.googleapis.com/v0/b/.../o/transcripts%2Fuserid%2Ffilename?alt=media
-      try {
-        const urlObj = new URL(session.transcriptUrl);
-        let path = urlObj.pathname.split('/o/')[1];
-        if (path) {
-          path = decodeURIComponent(path);
-          const tRef = sRef(storage, path);
-          await deleteObject(tRef);
-        }
-      } catch (e) {
-        console.warn("Could not delete from storage, might be already deleted or invalid url", e);
-      }
-    }
+    // 2. Delete Transcript from Realtime Database
+    const transcriptRef = ref(db, `users/${currentUser.uid}/saved_transcripts/${session.id}`);
+    await remove(transcriptRef);
 
-    // 3. Delete from Realtime Database
+    // 3. Delete from Realtime Database (Session Metadata)
     await remove(ref(db, `users/${currentUser.uid}/saved_sessions/${session.id}`));
 
   } catch (err) {

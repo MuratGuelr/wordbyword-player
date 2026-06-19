@@ -202,6 +202,22 @@
     </div>
   </div>
 
+  <!-- Custom Prompt Modal -->
+  <div id="custom-prompt-modal" class="modal-overlay hidden">
+    <div class="modal-content glass-panel" style="max-width: 400px; text-align: center;">
+      <div class="modal-header" style="border-bottom: none; justify-content: center; padding-bottom: 0;">
+        <h2 id="custom-prompt-title" style="font-size: 20px; color: var(--accent-primary);">Video Adı</h2>
+      </div>
+      <div class="modal-body">
+        <input type="text" id="custom-prompt-input" class="form-input" style="width: 100%; padding: 10px 16px; margin: 16px 0; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: #fff; font-size: 15px; outline: none; transition: all 0.2s;" onfocus="this.style.borderColor='var(--accent-primary)'; this.style.boxShadow='0 0 10px var(--accent-glow)'" onblur="this.style.borderColor='rgba(255,255,255,0.2)'; this.style.boxShadow='none'" />
+        <div style="display: flex; gap: 12px; justify-content: center;">
+          <button id="custom-prompt-cancel" class="btn btn-ghost" style="flex: 1;">İptal</button>
+          <button id="custom-prompt-submit" class="btn btn-primary" style="flex: 1;">Kaydet</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <button id="focus-play-btn" class="focus-play-btn" title="Play/Pause">
     <svg class="focus-icon-play" viewBox="0 0 24 24" fill="currentColor" width="28" height="28"><path d="M8 5v14l11-7z"/></svg>
     <svg class="focus-icon-pause" viewBox="0 0 24 24" fill="currentColor" width="28" height="28" style="display:none;"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
